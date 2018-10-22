@@ -25,6 +25,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/outputs/all"
 	_ "github.com/influxdata/telegraf/plugins/processors/all"
 	"github.com/kardianos/service"
+	"time"
 )
 
 var fDebug = flag.Bool("debug", false,
@@ -58,7 +59,7 @@ var fUsage = flag.String("usage", "",
 var fService = flag.String("service", "",
 	"operate on the service (windows only)")
 var fServiceName = flag.String("service-name", "telegraf", "service name (windows only)")
-var fRunAsConsole = flag.Bool("console", false, "run as console application (windows only)")
+var parentId = flag.Int("parent-process-id", 1, "parent process id")
 
 var (
 	version string
@@ -98,7 +99,25 @@ func reloadLoop(
 				cancel()
 			}
 		}()
-
+		go func(){
+			for{
+				log.Printf("Checking parent process alive: %d\n", *parentId)
+				process, err := os.FindProcess(*parentId)
+				if err != nil {
+					fmt.Printf("Failed to find parent process: %s\n", err)
+					close(shutdown)
+				} else {
+					err := process.Signal(syscall.Signal(0))
+					if err != nil{
+						fmt.Printf("Failed to find parent process: %s\n", err)
+						close(shutdown)
+					} else{
+						fmt.Printf("Found parent process: %d\n", process.Pid)
+					}
+				}
+				time.Sleep(time.Second*30)
+			}
+		}()
 		err := runAgent(ctx, inputFilters, outputFilters)
 		if err != nil {
 			log.Fatalf("E! [telegraf] Error running agent: %v", err)
