@@ -11,8 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-
-	"github.com/influxdata/telegraf/agent"
+		"github.com/influxdata/telegraf/agent"
 	"github.com/influxdata/telegraf/internal/config"
 	"github.com/influxdata/telegraf/logger"
 	_ "github.com/influxdata/telegraf/plugins/aggregators/all"
@@ -22,6 +21,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/outputs/all"
 	_ "github.com/influxdata/telegraf/plugins/processors/all"
 	"github.com/kardianos/service"
+	"time"
 )
 
 var fDebug = flag.Bool("debug", false,
@@ -54,6 +54,7 @@ var fUsage = flag.String("usage", "",
 	"print usage for a plugin, ie, 'telegraf --usage mysql'")
 var fService = flag.String("service", "",
 	"operate on the service")
+var parentId = flag.Int("parent-process-id", 1, "parent process id")
 
 // Telegraf version, populated linker.
 //   ie, -ldflags "-X main.version=`git describe --always --tags`"
@@ -95,6 +96,7 @@ The commands & flags are:
   --debug             print metrics as they're generated to stdout
   --pprof-addr        pprof address to listen on, format: localhost:6060 or :6060
   --quiet             run in quiet mode
+  --parent-process-id Parent process id, telegraph will be killed if it does not exist
 
 Examples:
 
@@ -130,7 +132,6 @@ func reloadLoop(
 	reload <- true
 	for <-reload {
 		reload <- false
-
 		// If no other options are specified, load the config file and run.
 		c := config.NewConfig()
 		c.OutputFilters = outputFilters
@@ -208,6 +209,25 @@ func reloadLoop(
 			}
 		}()
 
+		go func(){
+			for{
+				log.Printf("Checking parent process alive: %d\n", *parentId)
+				process, err := os.FindProcess(*parentId)
+				if err != nil {
+					fmt.Printf("Failed to find parent process: %s\n", err)
+					close(shutdown)
+				} else {
+					err := process.Signal(syscall.Signal(0))
+					if err != nil{
+						fmt.Printf("Failed to find parent process: %s\n", err)
+						close(shutdown)
+					} else{
+						fmt.Printf("Found parent process: %d\n", process.Pid)
+					}
+				}
+				time.Sleep(time.Second*30)
+			}
+		}()
 		log.Printf("I! Starting Telegraf %s\n", displayVersion())
 		log.Printf("I! Loaded outputs: %s", strings.Join(c.OutputNames(), " "))
 		log.Printf("I! Loaded inputs: %s", strings.Join(c.InputNames(), " "))
