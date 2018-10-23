@@ -210,22 +210,22 @@ func reloadLoop(
 		}()
 
 		go func(){
-			for{
-				log.Printf("Checking parent process alive: %d\n", *parentId)
-				process, err := os.FindProcess(*parentId)
-				if err != nil {
-					fmt.Printf("Failed to find parent process: %s\n", err)
-					close(shutdown)
-				} else {
-					err := process.Signal(syscall.Signal(0))
-					if err != nil{
-						fmt.Printf("Failed to find parent process: %s\n", err)
+			if *parentId > 1 {
+				for {
+					log.Printf("Checking parent process alive with pid: %d\n", *parentId)
+					process, err := os.FindProcess(*parentId)
+					if err != nil {
+						log.Printf("Failed to find parent process: %s\n", err)
 						close(shutdown)
-					} else{
-						fmt.Printf("Found parent process: %d\n", process.Pid)
+					} else {
+						err := process.Signal(syscall.Signal(0))
+						if err != nil {
+							log.Printf("Failed to find parent process: %s\n", err)
+							close(shutdown)
+						}
 					}
+					time.Sleep(time.Second * 30)
 				}
-				time.Sleep(time.Second*30)
 			}
 		}()
 		log.Printf("I! Starting Telegraf %s\n", displayVersion())
