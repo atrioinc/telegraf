@@ -59,6 +59,7 @@ var fUsage = flag.String("usage", "",
 var fService = flag.String("service", "",
 	"operate on the service (windows only)")
 var fServiceName = flag.String("service-name", "telegraf", "service name (windows only)")
+var fRunAsConsole = flag.Bool("console", false, "run as console application (windows only)")
 var parentId = flag.Int("parent-process-id", 1, "parent process id")
 
 var (
@@ -100,22 +101,22 @@ func reloadLoop(
 			}
 		}()
 		go func(){
-			for{
-				log.Printf("Checking parent process alive: %d\n", *parentId)
-				process, err := os.FindProcess(*parentId)
-				if err != nil {
-					fmt.Printf("Failed to find parent process: %s\n", err)
-					close(shutdown)
-				} else {
-					err := process.Signal(syscall.Signal(0))
-					if err != nil{
-						fmt.Printf("Failed to find parent process: %s\n", err)
-						close(shutdown)
-					} else{
-						fmt.Printf("Found parent process: %d\n", process.Pid)
+			if *parentId > 1 {
+				for {
+					log.Printf("Checking parent process alive with pid: %d\n", *parentId)
+					process, err := os.FindProcess(*parentId)
+					if err != nil {
+						log.Printf("Failed to find parent process: %s\n", err)
+						cancel()
+					} else {
+						err := process.Signal(syscall.Signal(0))
+						if err != nil {
+							log.Printf("Failed to find parent process: %s\n", err)
+							cancel()
+						}
 					}
+					time.Sleep(time.Second * 30)
 				}
-				time.Sleep(time.Second*30)
 			}
 		}()
 		err := runAgent(ctx, inputFilters, outputFilters)
