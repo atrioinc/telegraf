@@ -48,6 +48,14 @@ lint:
 test-all: lint
 	go test ./...
 
+
+static:
+	@echo "Building static linux binary..."
+	@CGO_ENABLED=0 \
+	GOOS=linux \
+	GOARCH=amd64 \
+	go build  -a -tags netgo -ldflags "$(LDFLAGS) -w -extldflags \"-static\"" ./cmd/telegraf
+
 package:
 	./scripts/build.py --package --platform=all --arch=all
 clean:
