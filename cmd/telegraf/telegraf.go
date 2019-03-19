@@ -7,25 +7,28 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	_ "net/http/pprof" // Comment this line to disable pprof endpoint.
 	"os"
 	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
 
+	"time"
+
 	"github.com/influxdata/telegraf/agent"
 	"github.com/influxdata/telegraf/internal"
 	"github.com/influxdata/telegraf/internal/config"
 	"github.com/influxdata/telegraf/logger"
-	_ "github.com/influxdata/telegraf/plugins/aggregators/all"
 	"github.com/influxdata/telegraf/plugins/inputs"
-	_ "github.com/influxdata/telegraf/plugins/inputs/all"
+	_ "github.com/influxdata/telegraf/plugins/inputs/cpu"
+	_ "github.com/influxdata/telegraf/plugins/inputs/diskio"
+	_ "github.com/influxdata/telegraf/plugins/inputs/exec"
+	_ "github.com/influxdata/telegraf/plugins/inputs/mem"
+	_ "github.com/influxdata/telegraf/plugins/inputs/net"
+	_ "github.com/influxdata/telegraf/plugins/inputs/system"
 	"github.com/influxdata/telegraf/plugins/outputs"
-	_ "github.com/influxdata/telegraf/plugins/outputs/all"
-	_ "github.com/influxdata/telegraf/plugins/processors/all"
+	_ "github.com/influxdata/telegraf/plugins/outputs/file"
 	"github.com/kardianos/service"
-	"time"
 )
 
 var fDebug = flag.Bool("debug", false,
@@ -60,7 +63,7 @@ var fService = flag.String("service", "",
 	"operate on the service (windows only)")
 var fServiceName = flag.String("service-name", "telegraf", "service name (windows only)")
 var fRunAsConsole = flag.Bool("console", false, "run as console application (windows only)")
-var parentId = flag.Int("parent-process-id", 1, "parent process id")
+var parentID = flag.Int("parent-process-id", 1, "parent process id")
 
 var (
 	version string
@@ -100,11 +103,11 @@ func reloadLoop(
 				cancel()
 			}
 		}()
-		go func(){
-			if *parentId > 1 {
+		go func() {
+			if *parentID > 1 {
 				for {
-					log.Printf("Checking parent process alive with pid: %d\n", *parentId)
-					process, err := os.FindProcess(*parentId)
+					log.Printf("Checking parent process alive with pid: %d\n", *parentID)
+					process, err := os.FindProcess(*parentID)
 					if err != nil {
 						log.Printf("Failed to find parent process: %s\n", err)
 						cancel()
