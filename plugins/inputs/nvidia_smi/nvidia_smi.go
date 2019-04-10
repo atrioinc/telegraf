@@ -16,20 +16,22 @@ import (
 
 var (
 	measurement = "nvidia_smi"
-	metrics     = "fan.speed,memory.total,memory.used,memory.free,pstate,temperature.gpu,name,uuid,compute_mode,utilization.gpu,utilization.memory,index,power.draw"
+	metrics     = "timestamp,name,pstate,index,utilization.gpu,clocks.current.sm,utilization.memory,clocks.current.memory,memory.total,memory.used,memory.free,temperature.gpu,uuid,compute_mode,power.draw"
 	metricNames = [][]string{
-		{"fan_speed", "integer"},
+		{"timestamp", "time"},
+		{"name", "tag"},
+		{"pstate", "tag"},
+		{"index", "tag"},
+		{"utilization_gpu", "integer"},
+		{"clocks_current_sm", "integer"},
+		{"utilization_memory", "integer"},
+		{"clocks_current_memory", "integer"},
 		{"memory_total", "integer"},
 		{"memory_used", "integer"},
 		{"memory_free", "integer"},
-		{"pstate", "tag"},
 		{"temperature_gpu", "integer"},
-		{"name", "tag"},
 		{"uuid", "tag"},
 		{"compute_mode", "tag"},
-		{"utilization_gpu", "integer"},
-		{"utilization_memory", "integer"},
-		{"index", "tag"},
 		{"power_draw", "float"},
 	}
 )
@@ -102,11 +104,11 @@ func gatherNvidiaSMI(ret string, acc telegraf.Accumulator) error {
 	// First split the lines up and handle each one
 	scanner := bufio.NewScanner(strings.NewReader(ret))
 	for scanner.Scan() {
-		tags, fields, err := parseLine(scanner.Text())
+		tags, fields, timeStamp, err := parseLine(scanner.Text())
 		if err != nil {
 			return err
 		}
-		acc.AddFields(measurement, fields, tags)
+		acc.AddFields(measurement, fields, tags, timeStamp)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -116,10 +118,10 @@ func gatherNvidiaSMI(ret string, acc telegraf.Accumulator) error {
 	return nil
 }
 
-func parseLine(line string) (map[string]string, map[string]interface{}, error) {
+func parseLine(line string) (map[string]string, map[string]interface{}, time.Time, error) {
 	tags := make(map[string]string, 0)
 	fields := make(map[string]interface{}, 0)
-
+	var timeStamp time.Time
 	// Next split up the comma delimited metrics
 	met := strings.Split(line, ",")
 
@@ -140,9 +142,11 @@ func parseLine(line string) (map[string]string, map[string]interface{}, error) {
 
 			// Parse the integers
 			if m[1] == "integer" {
+				col = strings.TrimSuffix(col, " %")
+				col = strings.TrimSuffix(col, " MHz")
 				out, err := strconv.ParseInt(col, 10, 64)
 				if err != nil {
-					return tags, fields, err
+					return tags, fields, timeStamp, err
 				}
 				fields[m[0]] = out
 			}
@@ -151,16 +155,25 @@ func parseLine(line string) (map[string]string, map[string]interface{}, error) {
 			if m[1] == "float" {
 				out, err := strconv.ParseFloat(col, 64)
 				if err != nil {
-					return tags, fields, err
+					return tags, fields, timeStamp, err
 				}
 				fields[m[0]] = out
+			}
+			// Parse the floats
+			if m[1] == "time" {
+				layout := "2006/01/02 15:04:05.000"
+				t, err := time.Parse(layout, col)
+				if err != nil {
+					return tags, fields, timeStamp, err
+				}
+				timeStamp = t
 			}
 		}
 
 		// Return the tags and fields
-		return tags, fields, nil
+		return tags, fields, timeStamp, nil
 	}
 
 	// If the line is empty return an emptyline error
-	return tags, fields, fmt.Errorf("Different number of metrics returned (%d) than expeced (%d)", len(met), len(metricNames))
+	return tags, fields, timeStamp, fmt.Errorf("Different number of metrics returned (%d) than expeced (%d)", len(met), len(metricNames))
 }
