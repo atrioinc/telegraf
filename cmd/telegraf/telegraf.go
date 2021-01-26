@@ -25,6 +25,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/inputs/exec"
 	_ "github.com/influxdata/telegraf/plugins/inputs/mem"
 	_ "github.com/influxdata/telegraf/plugins/inputs/net"
+	_ "github.com/influxdata/telegraf/plugins/inputs/nvidia_smi"
 	_ "github.com/influxdata/telegraf/plugins/inputs/system"
 	"github.com/influxdata/telegraf/plugins/outputs"
 	_ "github.com/influxdata/telegraf/plugins/outputs/file"
